@@ -12,6 +12,12 @@ Clone all repositories of user Narnach, using the public clone URLs:
 Clone all repositories of user Narnach, using the private clone URLs and suppressing console output:
   github-clone Narnach -q --private
 
+== Ideas / todo
+
+* Add support to fetch/pull repositories as well as clone them. This makes automatic backups a possibility.
+* Turn this script into a proper ruby gem.
+* Add support to clone gitosis-managed repositories.
+
 == Author
 
 Copyright (c) 2008 - Wes Oldenbeuving, released under the MIT license.
