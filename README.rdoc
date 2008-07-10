@@ -1,0 +1,17 @@
+= Github-clone
+
+== Description
+
+Github-clone makes it easy to clone all github projects of a user, using either the public or private clone urls for the projects.
+
+== Examples
+
+Clone all repositories of user Narnach, using the public clone URLs:
+  github-clone Narnach
+  
+Clone all repositories of user Narnach, using the private clone URLs and suppressing console output:
+  github-clone Narnach -q --private
+
+== Author
+
+Copyright (c) 2008 - Wes Oldenbeuving, released under the MIT license.
