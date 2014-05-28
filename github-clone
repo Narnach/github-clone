@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 require 'open-uri'
-require 'yaml'
+require 'json'
 
 # Clone all of a user's GitHub repositories.
 class GithubClone
@@ -39,29 +39,29 @@ class GithubClone
   
   # The github API URL for this user
   def url
-    @url ||= "http://github.com/api/v1/yaml/%s" % username
+    @url ||= "https://api.github.com/users/%s/repos" % username
   end
   
-  # Get the raw yaml from the server
-  def raw_yaml
-    @raw_yaml ||= open(url).read
+  # Get the raw json from the server
+  def raw_json
+    @raw_json ||= open(url).read
   end
   
-  # Parse the raw yaml data
+  # Parse the raw json data
   def data
-    @data ||= YAML.load(raw_yaml)
+    @data ||= JSON.parse(raw_json)
   end
   
   # Returns all repositories of a user
   def repositories
-    data['user']['repositories']
+    data
   end
   
   # Returns the name and clone url for all of a user's repositories.
   def clone_repositories
     @clone_repositories ||= (
       repositories.map do |repo|
-        repo_name = repo[:name]
+        repo_name = repo["name"]
         clone_url = private_clone_url(repo_name)
         next repo_name, clone_url(repo_name)
       end
