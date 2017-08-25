@@ -1,31 +1,31 @@
 #!/usr/bin/env ruby
 require 'open-uri'
-require 'yaml'
+require 'json'
 
 # Clone all of a user's GitHub repositories.
 class GithubClone
   attr_accessor :quiet, :use_private_clone_url
   attr_reader   :username
-  
+
   def initialize(username)
     @username = username
     @quiet = false
     @use_private_clone_url = false
   end
-  
+
   # Clone all repositories which do not exist in the local directory.
   def clone_new_repositories
     clone_repositories.each do |name, clone_url|
       if File.exist?(name)
         puts("Skipping existing project '%s'" % name) unless quiet
-        next 
+        next
       end
       execute_cmd "git clone %s" % clone_url
     end
   end
-  
+
   private
-  
+
   # Execute something on the command line
   # Will suppress output if #quiet is true.
   def execute_cmd(cmd)
@@ -36,38 +36,38 @@ class GithubClone
     end
     system(cmd)
   end
-  
+
   # The github API URL for this user
   def url
-    @url ||= "http://github.com/api/v1/yaml/%s" % username
+    @url ||= "https://api.github.com/users/%s/repos" % username
   end
-  
+
   # Get the raw yaml from the server
-  def raw_yaml
-    @raw_yaml ||= open(url).read
+  def raw_data
+    @raw_data ||= open(url, {"Accept" => "application/vnd.github.v3+json"}).read
   end
-  
+
   # Parse the raw yaml data
   def data
-    @data ||= YAML.load(raw_yaml)
+    puts raw_data
+    @data ||= JSON.parse(raw_data)
   end
-  
+
   # Returns all repositories of a user
   def repositories
-    data['user']['repositories']
+    data
   end
-  
+
   # Returns the name and clone url for all of a user's repositories.
   def clone_repositories
     @clone_repositories ||= (
       repositories.map do |repo|
-        repo_name = repo[:name]
-        clone_url = private_clone_url(repo_name)
+        repo_name = repo['name']
         next repo_name, clone_url(repo_name)
       end
     )
   end
-  
+
   # Return the clone url for a repository.
   # Decides between the private and public url based on #use_private_clone_url.
   def clone_url(repo_name)
@@ -77,7 +77,7 @@ class GithubClone
       public_clone_url(repo_name)
     end
   end
-  
+
   # The private clone url for a repository.
   def private_clone_url(repo_name)
     "git@github.com:%s/%s.git" % [username, repo_name]
@@ -96,7 +96,7 @@ if %w[-h --help help].include? username or username.to_s == ''
   puts <<-EOS
 Syntax:
   github-clone <Username> [ -q ] [ --public | --private ]
-  
+
   Username is your github username.
   -q                  Run github-clone in quiet mode, suppressing all output.
   --public, --private Use public or private clone URL. Defaults to use public.
