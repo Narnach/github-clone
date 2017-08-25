@@ -4,23 +4,32 @@ require 'json'
 
 # Clone all of a user's GitHub repositories.
 class GithubClone
-  attr_accessor :quiet, :use_private_clone_url
-  attr_reader   :username
+  attr_accessor :quiet, :use_private_clone_url, :dry_run
+  attr_reader :username
 
   def initialize(username)
     @username = username
     @quiet = false
     @use_private_clone_url = false
+    @github_user = nil
+    @github_token = nil
+    @use_basic_auth = false
+    @dry_run = false
   end
 
   # Clone all repositories which do not exist in the local directory.
   def clone_new_repositories
+    determine_github_config
     clone_repositories.each do |name, clone_url|
       if File.exist?(name)
-        puts("Skipping existing project '%s'" % name) unless quiet
+        feedback "Already exists: #{name} for #{clone_url}"
         next
       end
-      execute_cmd "git clone %s" % clone_url
+      if dry_run
+        feedback "Would clone #{name}: #{clone_url}"
+      else
+        execute_cmd "git clone #{clone_url}"
+      end
     end
   end
 
@@ -37,44 +46,83 @@ class GithubClone
     system(cmd)
   end
 
+  def feedback(msg)
+    puts(msg) unless quiet
+  end
+
   # The github API URL for this user
-  def url
-    @url ||= "https://api.github.com/users/%s/repos" % username
+  def urls
+    if @github_user && @github_token
+      # Ideally we fetch a merged list of all types, but the API will not allow this.
+      [
+        "https://api.github.com/user/repos?affiliation=owner",
+        "https://api.github.com/user/repos?affiliation=organization_member",
+        "https://api.github.com/user/repos?affiliation=collaborator",
+      ]
+    else
+      ["https://api.github.com/users/%s/repos" % username]
+    end
+  end
+
+  def determine_github_config
+    return if @determined_github_config
+    @determined_github_config = true
+    github_user = `git config --global github.user`.strip
+    if github_user != ""
+      github_token = `git config --global github.token`.strip
+      if github_token != ""
+        if github_user == username
+          @github_user = github_user
+          @github_token = github_token
+          @use_basic_auth = true
+          feedback "Username matches github.user configuration, so using that to access private repositories."
+        else
+          feedback "github.user #{@github_user} does not match requested username #{username}. Only fetching public repositories."
+          feedback "Username is different from github.user configuration, so only accessing public repositories."
+        end
+      else
+        feedback <<-ERR
+github.token was not defined, so only fetching public repositories. For more information see:
+  https://github.com/blog/180-local-github-config
+  https://github.com/settings/tokens
+        ERR
+      end
+    else
+      feedback <<-ERR
+github.user was not defined, so only fetching public repositories. For more information see:
+  https://github.com/blog/180-local-github-config
+  https://github.com/settings/tokens
+      ERR
+    end
   end
 
   # Get the raw yaml from the server
-  def raw_data
-    @raw_data ||= open(url, {"Accept" => "application/vnd.github.v3+json"}).read
-  end
-
-  # Parse the raw yaml data
-  def data
-    puts raw_data
-    @data ||= JSON.parse(raw_data)
+  def fetch_data(url)
+    headers = { "Accept" => "application/vnd.github.v3+json" }
+    if @use_basic_auth
+      headers[:http_basic_authentication] = [@github_user, @github_token]
+    end
+    json = open(url, headers).read
+    JSON.parse(json)
   end
 
   # Returns all repositories of a user
   def repositories
-    data
+    urls.map { |url| fetch_data(url) }.flatten
   end
 
   # Returns the name and clone url for all of a user's repositories.
   def clone_repositories
-    @clone_repositories ||= (
-      repositories.map do |repo|
-        repo_name = repo['name']
-        next repo_name, clone_url(repo_name)
-      end
-    )
+    repositories.map { |repo| next repo['name'], clone_url(repo) }.uniq
   end
 
   # Return the clone url for a repository.
   # Decides between the private and public url based on #use_private_clone_url.
-  def clone_url(repo_name)
+  def clone_url(repo)
     if use_private_clone_url
-      private_clone_url(repo_name)
+      repo['ssh_url']
     else
-      public_clone_url(repo_name)
+      repo['clone_url']
     end
   end
 
@@ -97,9 +145,16 @@ if %w[-h --help help].include? username or username.to_s == ''
 Syntax:
   github-clone <Username> [ -q ] [ --public | --private ]
 
-  Username is your github username.
+This will clone all repositories of <Username> into separate directories inside the current directory.
+When run we check if the git configuration github.user is set. If it is the same as <Username>, 
+we also clone private repositories.
+
+Parameters:
+
+  <Username> is your github username.
   -q                  Run github-clone in quiet mode, suppressing all output.
   --public, --private Use public or private clone URL. Defaults to use public.
+  --dry-run           Only fetch a list of repositories and print it, but do not actually clone them.
   EOS
   exit
 end
@@ -114,6 +169,9 @@ while option = ARGV.shift
     gh.use_private_clone_url = false
   when '--private'
     gh.use_private_clone_url = true
+  when '--dry-run'
+    gh.dry_run = true
+    gh.quiet = false
   else
     puts "Unknown option '%s'" % option
     exit
