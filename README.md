@@ -43,4 +43,5 @@ You can find and/or setup your access tokens here. You only need the `repo` scop
 ## Author
 
 Copyright (c) 2008-2017 - Wes Oldenbeuving, released under the MIT license.
+
 Copyright (c) 2017 - Matija Nalis, released under the MIT license.
