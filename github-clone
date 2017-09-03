@@ -22,9 +22,16 @@ class GithubClone
   def clone_new_repositories
     determine_github_config
     clone_repositories.each do |name, clone_url|
-      if File.exist?(name)
-        feedback "Already exists: #{name} for #{clone_url}"
-        next
+      if use_mirror
+        if File.exist?(name + ".git")
+          feedback "Already exists: #{name}.git for #{clone_url}"
+          next
+        end
+      else
+        if File.exist?(name)
+          feedback "Already exists: #{name} for #{clone_url}"
+          next
+        end
       end
       if dry_run
         feedback "Would clone #{name}: #{clone_url}"
