@@ -4,13 +4,14 @@ require 'json'
 
 # Clone all of a user's GitHub repositories.
 class GithubClone
-  attr_accessor :quiet, :use_private_clone_url, :dry_run
+  attr_accessor :quiet, :use_private_clone_url, :use_mirror, :dry_run
   attr_reader :username
 
   def initialize(username)
     @username = username
     @quiet = false
     @use_private_clone_url = false
+    @use_mirror = false
     @github_user = nil
     @github_token = nil
     @use_basic_auth = false
@@ -28,7 +29,11 @@ class GithubClone
       if dry_run
         feedback "Would clone #{name}: #{clone_url}"
       else
-        execute_cmd "git clone #{clone_url}"
+        if use_mirror
+           execute_cmd "git clone --mirror #{clone_url}"
+        else
+           execute_cmd "git clone #{clone_url}"
+        end
       end
     end
   end
@@ -143,7 +148,7 @@ username = ARGV.shift
 if %w[-h --help help].include? username or username.to_s == ''
   puts <<-EOS
 Syntax:
-  github-clone <Username> [ -q ] [ --public | --private ]
+  github-clone <Username> [ -q ] [ --dry-run ] [ --public | --private ] [ --mirror ]
 
 This will clone all repositories of <Username> into separate directories inside the current directory.
 When run we check if the git configuration github.user is set. If it is the same as <Username>, 
@@ -154,6 +159,7 @@ Parameters:
   <Username> is your github username.
   -q                  Run github-clone in quiet mode, suppressing all output.
   --public, --private Use public or private clone URL. Defaults to use public.
+  --mirror            Clone with --mirror to bare repository
   --dry-run           Only fetch a list of repositories and print it, but do not actually clone them.
   EOS
   exit
@@ -169,6 +175,8 @@ while option = ARGV.shift
     gh.use_private_clone_url = false
   when '--private'
     gh.use_private_clone_url = true
+  when '--mirror'
+    gh.use_mirror = true
   when '--dry-run'
     gh.dry_run = true
     gh.quiet = false

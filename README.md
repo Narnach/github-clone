@@ -3,6 +3,7 @@
 ## Description
 
 Github-clone makes it easy to clone all github projects of a user, using either the public or private clone urls for the projects.
+This version adds option modified to clone to bare repository with "--mirror"
 
 ## Examples
 
