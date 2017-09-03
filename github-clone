@@ -22,25 +22,26 @@ class GithubClone
   def clone_new_repositories
     determine_github_config
     clone_repositories.each do |name, clone_url|
+      cmd = "git clone";
       if use_mirror
-        if File.exist?(name + ".git")
-          feedback "Already exists: #{name}.git for #{clone_url}"
-          next
-        end
-      else
-        if File.exist?(name)
+        name = name + ".git"
+        cmd = cmd + " --mirror"
+      end
+      cmd = "#{cmd} #{clone_url}"
+
+      if File.exist?(name)
+        if use_mirror
+          cmd = "git --git-dir=#{name} fetch --tags"
+        else
           feedback "Already exists: #{name} for #{clone_url}"
           next
         end
       end
+
       if dry_run
-        feedback "Would clone #{name}: #{clone_url}"
+        feedback "Would do #{cmd}"
       else
-        if use_mirror
-           execute_cmd "git clone --mirror #{clone_url}"
-        else
-           execute_cmd "git clone #{clone_url}"
-        end
+        execute_cmd cmd
       end
     end
   end
@@ -166,7 +167,7 @@ Parameters:
   <Username> is your github username.
   -q                  Run github-clone in quiet mode, suppressing all output.
   --public, --private Use public or private clone URL. Defaults to use public.
-  --mirror            Clone with --mirror to bare repository
+  --mirror            Clone with --mirror to bare repository. Will also update with "git fetch" if already exists.
   --dry-run           Only fetch a list of repositories and print it, but do not actually clone them.
   EOS
   exit
