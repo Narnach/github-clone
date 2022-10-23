@@ -115,7 +115,7 @@ github.user was not defined, so only fetching public repositories. For more info
     if @use_basic_auth
       headers[:http_basic_authentication] = [@github_user, @github_token]
     end
-    json = open(url, headers).read
+    json = URI.open(url, headers).read
     JSON.parse(json)
   end
 
