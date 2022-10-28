@@ -4,13 +4,14 @@ require 'json'
 
 # Clone all of a user's GitHub repositories.
 class GithubClone
-  attr_accessor :quiet, :use_private_clone_url, :dry_run
+  attr_accessor :quiet, :use_private_clone_url, :use_mirror, :dry_run
   attr_reader :username
 
   def initialize(username)
     @username = username
     @quiet = false
     @use_private_clone_url = false
+    @use_mirror = false
     @github_user = nil
     @github_token = nil
     @use_basic_auth = false
@@ -21,14 +22,26 @@ class GithubClone
   def clone_new_repositories
     determine_github_config
     clone_repositories.each do |name, clone_url|
-      if File.exist?(name)
-        feedback "Already exists: #{name} for #{clone_url}"
-        next
+      cmd = "git clone";
+      if use_mirror
+        name = name + ".git"
+        cmd = cmd + " --mirror"
       end
+      cmd = "#{cmd} #{clone_url}"
+
+      if File.exist?(name)
+        if use_mirror
+          cmd = "git --git-dir=#{name} fetch --tags"
+        else
+          feedback "Already exists: #{name} for #{clone_url}"
+          next
+        end
+      end
+
       if dry_run
-        feedback "Would clone #{name}: #{clone_url}"
+        feedback "Would do #{cmd}"
       else
-        execute_cmd "git clone #{clone_url}"
+        execute_cmd cmd
       end
     end
   end
@@ -102,7 +115,7 @@ github.user was not defined, so only fetching public repositories. For more info
     if @use_basic_auth
       headers[:http_basic_authentication] = [@github_user, @github_token]
     end
-    json = open(url, headers).read
+    json = URI.open(url, headers).read
     JSON.parse(json)
   end
 
@@ -143,7 +156,7 @@ username = ARGV.shift
 if %w[-h --help help].include? username or username.to_s == ''
   puts <<-EOS
 Syntax:
-  github-clone <Username> [ -q ] [ --public | --private ]
+  github-clone <Username> [ -q ] [ --dry-run ] [ --public | --private ] [ --mirror ]
 
 This will clone all repositories of <Username> into separate directories inside the current directory.
 When run we check if the git configuration github.user is set. If it is the same as <Username>, 
@@ -154,6 +167,7 @@ Parameters:
   <Username> is your github username.
   -q                  Run github-clone in quiet mode, suppressing all output.
   --public, --private Use public or private clone URL. Defaults to use public.
+  --mirror            Clone with --mirror to bare repository. Will also update with "git fetch" if already exists.
   --dry-run           Only fetch a list of repositories and print it, but do not actually clone them.
   EOS
   exit
@@ -169,6 +183,8 @@ while option = ARGV.shift
     gh.use_private_clone_url = false
   when '--private'
     gh.use_private_clone_url = true
+  when '--mirror'
+    gh.use_mirror = true
   when '--dry-run'
     gh.dry_run = true
     gh.quiet = false
